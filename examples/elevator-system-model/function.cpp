@@ -219,25 +219,34 @@ void transport_people_current_floor(){
 /// 电梯上升到达目的地
 void elevator_arrival_UP_2_destination(){
     if(elevator_floor != FLOOR_NUM){//没到顶层
-        elevator_destination = has_up_passenger(elevator_floor);
+        elevator_destination = has_up_passenger_above(elevator_floor);
         if(elevator_destination == elevator_floor){//上面楼层没有人要上楼了
-            /*当前楼层有下楼的人吗*/
-            if(list_size[elevator_floor + 3] != 0){
-                elevator_direction = DOWN;
-                transport_people_current_floor();
+            /*以上楼层有下楼的吗*/
+            elevator_destination = has_down_passenger_above(elevator_floor);
+            if(elevator_destination != elevator_floor){//上面楼层有人要下楼，电梯上行去接Ta
                 event_schedule(sim_time + 0.25, EVENT_ELEVATOR_ARRIVAL);
             }
             else{
-                /*电梯返回驻点，注：返回的途中可以搭乘同方向的人*/
-                if(elevator_floor != HOME_BASE){
-                    elevator_direction = HOME_BASE > elevator_floor ? UP : DOWN;
-                    elevator_destination = HOME_BASE;
+                /*上面楼层既没有人要上楼，也没人要下楼，电梯即将下行*/
+                /*当前楼层有下楼的人吗*/
+                if(list_size[elevator_floor + 3] != 0){
+                    elevator_direction = DOWN;
+                    transport_people_current_floor();
                     event_schedule(sim_time + 0.25, EVENT_ELEVATOR_ARRIVAL);
                 }
-                else{//当前就是驻点，且该驻点 != 1,因为当前电梯是上行到目的地 
-                    elevator_direction = IDLE;  
+                else{
+                    /*电梯返回驻点，注：返回的途中可以搭乘同方向的人*/
+                    if(elevator_floor != HOME_BASE){
+                        elevator_direction = HOME_BASE > elevator_floor ? UP : DOWN;
+                        elevator_destination = HOME_BASE;
+                        event_schedule(sim_time + 0.25, EVENT_ELEVATOR_ARRIVAL);
+                    }
+                    else{//当前就是驻点，且该驻点 != 1,因为当前电梯是上行到目的地 
+                        elevator_direction = IDLE;  
+                    }
                 }
             }
+            
             
         }
         else{
@@ -268,24 +277,33 @@ void elevator_arrival_UP_2_destination(){
 
 void elevator_arrival_DOWN_2_destination(){
     if(elevator_floor != 1){//没到一楼
-        elevator_destination = has_down_passenger(elevator_floor);
+        elevator_destination = has_down_passenger_below(elevator_floor);
         if(elevator_destination == elevator_floor){//下面楼层没有人要下楼了
-            /*当前楼层有上楼的人吗*/
-            if(list_size[elevator_floor] != 0){
-                elevator_direction = UP;
-                transport_people_current_floor();
+        /*下面楼层是否有上楼的人*/
+            elevator_destination = has_up_passenger_below(elevator_floor);
+            if(elevator_destination != elevator_floor){//下面楼层有人要上楼，电梯下行去接Ta
                 event_schedule(sim_time + 0.25, EVENT_ELEVATOR_ARRIVAL);
             }
-            else{/*没上楼的人，返回驻点*/
-                if(elevator_floor != HOME_BASE){
-                    elevator_direction = HOME_BASE > elevator_floor ? UP : DOWN;
-                    elevator_destination = HOME_BASE;
+            else{
+                /*下面楼层既没有人要上楼，也没人要下楼*/
+                /*当前楼层有上楼的人吗*/
+                if(list_size[elevator_floor] != 0){
+                    elevator_direction = UP;
+                    transport_people_current_floor();
                     event_schedule(sim_time + 0.25, EVENT_ELEVATOR_ARRIVAL);
                 }
-                else{
-                    elevator_direction = IDLE;
+                else{/*没上楼的人，返回驻点*/
+                    if(elevator_floor != HOME_BASE){
+                        elevator_direction = HOME_BASE > elevator_floor ? UP : DOWN;
+                        elevator_destination = HOME_BASE;
+                        event_schedule(sim_time + 0.25, EVENT_ELEVATOR_ARRIVAL);
+                    }
+                    else{
+                        elevator_direction = IDLE;
+                    }
                 }
             }
+            
         }
         else{//下面楼层有人要下楼，继续向下接客
             event_schedule(sim_time + 0.25 , EVENT_ELEVATOR_ARRIVAL);
@@ -369,7 +387,7 @@ void report(){
     fprintf(outfile , "Elevator-system-model\n\n\n\n");
 
     fprintf(outfile , "-----------------------------------\n");
-    fprintf(outfile , "Average delay in queue in each direction\n\n");
+    fprintf(outfile , "Average delay in queue in each direction\nHOME_BASE : %d\n" , HOME_BASE);
     fprintf(outfile , "LIST_QUEUE_UP_1:\t%10.5f\n" , sampst(0.0 , -SAMPST_DELAY_UP_1) );
     fprintf(outfile , "LIST_QUEUE_UP_2:\t%10.5f\n" , sampst(0.0 , -SAMPST_DELAY_UP_2) );
     fprintf(outfile , "LIST_QUEUE_UP_3:\t%10.5f\n" , sampst(0.0 , -SAMPST_DELAY_UP_3) );
@@ -413,7 +431,7 @@ void report(){
     T_IDLE /= T_SUM;
     T_EMPTY /= T_SUM;
     T_FILL /= T_SUM;
-    fprintf(outfile , "Proportion of time that the elevator is moving with people,moving empty, and idle%10.5f\t%10.5f\t%10.5f\n" , T_FILL , T_EMPTY , T_IDLE);
+    fprintf(outfile , "Proportion of time that the elevator is moving with people,moving empty,idle%10.5f  %10.5f  %10.5f\n" , T_FILL , T_EMPTY , T_IDLE);
 
 
 
@@ -472,7 +490,7 @@ int get_floor_change_destination(int _floor){
     return floor[2];
 }
 
-int has_up_passenger(int cur_floor){
+int has_up_passenger_above(int cur_floor){
     /*当电梯上行，到达目的地时，电梯中没人，调用该函数获取新的目的地*/
     /*电梯上行时，当前楼层cur_floor(cur_floor < FLOOR_NUM)以上的楼层是否有人想上楼
     若有，则电梯的目的地更新为最近想上楼的人所在的楼层*/
@@ -486,7 +504,21 @@ int has_up_passenger(int cur_floor){
     return elevator_destination_update;
 }
 
-int has_down_passenger(int cur_floor){
+int has_down_passenger_above(int cur_floor){
+    /*当电梯上行，到达目的地时，电梯中没人，调用该函数获取新的目的地*/
+    /*电梯上行时，当前楼层cur_floor(cur_floor > 1)以上的楼层是否有人想下楼
+    若有，则电梯的目的地更新为最近想下楼的人所在的楼层*/
+    int elevator_destination_update = cur_floor;
+    for(int i = FLOOR_NUM ; i > cur_floor ; i--){
+        if(list_size[i + 3] > 0){
+            elevator_destination_update = i;
+            break;
+        }
+    }
+    return elevator_destination_update;
+}
+
+int has_down_passenger_below(int cur_floor){
     /*当电梯下行，到达目的地时，电梯中没人，调用该函数获取新的目的地*/
     /*电梯下行时，当前楼层cur_floor(cur_floor > 1)以下的楼层是否有人想下楼
     若有，则电梯的目的地更新为最近想下楼的人所在的楼层*/
@@ -500,6 +532,20 @@ int has_down_passenger(int cur_floor){
     return elevator_destination_update;
 }
 
+int has_up_passenger_below(int cur_floor){
+    /*当电梯下行，到达目的地时，电梯中没人，调用该函数获取新的目的地*/
+    /*电梯下行时，当前楼层cur_floor(cur_floor < FLOOR_NUM)以下的楼层是否有人想上楼
+    若有，则电梯的目的地更新为最近想上楼的人所在的楼层*/
+    int elevator_destination_update = cur_floor;
+
+    for(int i = 1 ; i < cur_floor  ; i++){
+        if(list_size[i] > 0){
+            elevator_destination_update = i;
+            break;
+        }
+    }
+    return elevator_destination_update;
+}
 ///for debug : print the content of the list
 
 void print_list(int list){
