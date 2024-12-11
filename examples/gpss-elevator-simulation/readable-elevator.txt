@@ -1,0 +1,100 @@
+**************************************************
+*  initial
+	elevator STORAGE 6	;
+	RMULT      39941	;random seed
+**************************************************
+* logic of elevator
+	GENERATE ,,,1	;change elevator's current floor every 0.25 minutes,prority=1(prior to the transaction that passenger enters elevator)
+	SAVEVALUE cur_floor,1
+	SAVEVALUE direction,1
+
+up	SAVEVALUE direction,1
+	ADVANCE 0.25
+	SAVEVALUE cur_floor+,1
+	TEST NE X$cur_floor,5,down
+	TRANSFER ,up
+	
+down	SAVEVALUE direction,-1
+	ADVANCE 0.25
+	SAVEVALUE cur_floor-,1
+	TEST NE X$cur_floor,1,up
+	TRANSFER ,down
+**************************************************
+* 1st floor
+	GENERATE (Exponential(1,0,1))
+	QUEUE up_1
+	QUEUE AVG_DELAY
+	TEST E X$cur_floor,1		;check whether elevator is on 1st floor
+	GATE SNF elevator		;check whether elevator is full or not , if full ,block here
+	ENTER elevator
+	DEPART up_1
+	DEPART AVG_DELAY	
+	
+*   determine the delay of transaction
+	TRANSFER .25,,floor_2nd
+	TRANSFER .3333,,floor_3rd
+	TRANSFER .5,,floor_4th
+	TRANSFER ,floor_5th	
+**************************************************
+*2nd floor
+floor_2nd	ADVANCE 0.25;
+	LEAVE elevator;
+	ADVANCE (Uniform(1,15,120))
+	QUEUE down_2
+	QUEUE AVG_DELAY
+	TEST E X$cur_floor,2
+	TEST E X$direction,-1
+	GATE SNF elevator
+	ENTER elevator
+	DEPART down_2
+	DEPART AVG_DELAY
+	ADVANCE 0.25
+	TRANSFER ,passenager_leave
+**************************************************
+*3rd floor
+floor_3rd	ADVANCE 0.5;
+	LEAVE elevator;
+	ADVANCE (Uniform(1,15,120))
+	QUEUE down_3
+	QUEUE AVG_DELAY
+	TEST E X$cur_floor,3
+	TEST E X$direction,-1
+	GATE SNF elevator
+	ENTER elevator
+	DEPART down_3
+	DEPART AVG_DELAY
+	ADVANCE 0.5
+	TRANSFER ,passenager_leave
+**************************************************
+*4th floor
+floor_4th	ADVANCE 0.75;
+	LEAVE elevator;
+	ADVANCE (Uniform(1,15,120))
+	QUEUE down_4
+	QUEUE AVG_DELAY
+	TEST E X$cur_floor,4
+	TEST E X$direction,-1
+	GATE SNF elevator
+	ENTER elevator
+	DEPART down_4
+	DEPART AVG_DELAY
+	ADVANCE 0.75
+	TRANSFER ,passenager_leave
+**************************************************
+*5th floor
+floor_5th	ADVANCE 1;
+	LEAVE elevator;
+	ADVANCE (Uniform(1,15,120))
+	QUEUE down_5
+	QUEUE AVG_DELAY
+	TEST E X$cur_floor,5
+	TEST E X$direction,-1
+	GATE SNF elevator
+	ENTER elevator
+	DEPART down_5
+	DEPART AVG_DELAY
+	ADVANCE 1
+	TRANSFER ,passenager_leave
+**************************************************
+passenager_leave	LEAVE elevator
+		TERMINATE 1
